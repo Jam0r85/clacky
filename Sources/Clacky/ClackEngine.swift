@@ -11,6 +11,8 @@ import Foundation
 /// hardware is released, so an idle Clacky uses no audio CPU at all.
 final class ClackEngine {
     static let idleTimeout: CFTimeInterval = 20
+    /// Every sound is decoded to this rate, and the mixer runs at it.
+    static let sampleRate: Float = 48_000
 
     private let engine = AVAudioEngine()
     private let mixer: OpaquePointer
@@ -33,7 +35,7 @@ final class ClackEngine {
         mixer = kc_mixer_create()
         kc_mixer_set_volume(mixer, volume)
 
-        let format = AVAudioFormat(standardFormatWithSampleRate: Double(Synth.sampleRate), channels: 2)!
+        let format = AVAudioFormat(standardFormatWithSampleRate: Double(Self.sampleRate), channels: 2)!
         let m = mixer
         sourceNode = AVAudioSourceNode(format: format) { isSilence, _, frameCount, bufferList -> OSStatus in
             let buffers = UnsafeMutableAudioBufferListPointer(bufferList)
@@ -61,7 +63,7 @@ final class ClackEngine {
 
     // MARK: - Sounds
 
-    /// Selects a sound source by id: `rec:<switch>`, `synth:<profile>` or `pack:<folder>`.
+    /// Selects a sound source by id: `rec:<switch>` or `pack:<folder>`.
     func select(sourceID: String) throws {
         if source?.id == sourceID { return }
         let new = try cache[sourceID] ?? Self.makeSource(id: sourceID)
@@ -82,9 +84,6 @@ final class ClackEngine {
                 throw SoundPackError.noSounds
             }
             return try RecordedSource(recording: rec, directory: dir)
-        case "synth":
-            guard let profile = SwitchProfile.named(parts[1]) else { throw SoundPackError.noSounds }
-            return SynthSource(profile: profile)
         case "pack":
             return try PackSource(folder: PackLibrary.folder(named: parts[1]))
         default:
@@ -144,7 +143,7 @@ final class ClackEngine {
         let gainL = sqrtf(0.5 * (1 - s)), gainR = sqrtf(0.5 * (1 + s))
 
         let headRadius: Float = 0.0875, speedOfSound: Float = 343
-        let itd = headRadius / speedOfSound * (abs(azimuth) + abs(sinf(azimuth))) * Synth.sampleRate
+        let itd = headRadius / speedOfSound * (abs(azimuth) + abs(sinf(azimuth))) * Self.sampleRate
         let shadow = 1 - 0.55 * abs(sinf(azimuth)) / sinf(55 * Float.pi / 180)
 
         if pan > 0 { // key on the right: left ear is the far ear

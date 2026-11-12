@@ -10,7 +10,6 @@
 - **Spatial audio**: each key is placed where it sits on the keyboard, with per-ear level, timing and head-shadow filtering. Q comes from your left, P from your right. Best with headphones.
 - **Press and release sounds**, with bigger sounds for the spacebar, Return, Backspace and Shift. Every key keeps its own slightly different pitch, like a real board.
 - **Sound packs**: import any [Mechvibes](https://mechvibes.com/sound-packs) pack (V1 or V2, `.zip` or folder).
-- **Synthesized switches**: six built-in profiles generated in code, if you'd rather not use recordings.
 - **Light on your Mac**: about 2 MB on disk. The audio is mixed in C on the real-time thread with no allocations or locks. After 20 seconds without typing it releases the audio hardware, so it uses no audio CPU while you're idle. Turning it off removes the keyboard listener completely.
 
 ## Using it
@@ -57,8 +56,7 @@ Audio can be OGG, MP3, WAV, FLAC, AIFF or M4A. Keys a pack doesn't define borrow
 | `Sources/Clacky/ClackEngine.swift` | AVAudioEngine graph, binaural placement (Woodworth ITD + ILD + head shadow), idle suspend, device changes. |
 | `Sources/Clacky/KeyMonitor.swift` | Listen-only `CGEventTap` for key down, key up and modifiers. Ignores auto-repeat. |
 | `Sources/Clacky/KeyLayout.swift` | Maps Mac key codes to positions on an ANSI keyboard and to `KeyboardEvent.code` names. |
-| `Sources/Clacky/SoundSource.swift` | Bundled recordings, Mechvibes packs and synthesized profiles, all loudness-matched. |
-| `Sources/Clacky/Synth.swift`, `SwitchProfile.swift` | Modal synthesis of keystrokes: filtered-noise transients plus damped resonances. |
+| `Sources/Clacky/SoundSource.swift` | Bundled recordings and Mechvibes packs, all loudness-matched. |
 | `Sources/Clacky/AppController.swift` | Menu bar item and menu. |
 
 ## Credits

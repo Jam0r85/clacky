@@ -20,10 +20,7 @@ final class AppController: NSObject, NSMenuDelegate {
         engine.releaseSounds = settings.releaseSounds
         if (try? engine.select(sourceID: settings.sourceID)) == nil {
             settings.sourceID = "rec:\(RecordedSwitch.default.id)"
-            if (try? engine.select(sourceID: settings.sourceID)) == nil {
-                settings.sourceID = "synth:\(SwitchProfile.default.id)"
-                try? engine.select(sourceID: settings.sourceID)
-            }
+            try? engine.select(sourceID: settings.sourceID)
         }
 
         monitor.onKey = { [weak self] code, down in self?.engine.play(keyCode: code, down: down) }
@@ -140,15 +137,6 @@ final class AppController: NSObject, NSMenuDelegate {
             guard let rec = entry else { continue }
             menu.addItem(sourceItem(id: "rec:\(rec.id)", name: rec.name, detail: rec.kind))
         }
-
-        let synth = NSMenu()
-        for profile in SwitchProfile.all {
-            synth.addItem(sourceItem(id: "synth:\(profile.id)", name: profile.name, detail: profile.kind))
-        }
-        let synthItem = NSMenuItem(title: "Synthesized", action: nil, keyEquivalent: "")
-        synthItem.submenu = synth
-        synthItem.state = settings.sourceID.hasPrefix("synth:") ? .on : .off
-        menu.addItem(synthItem)
 
         let packs = NSMenu()
         let installed = PackLibrary.installed()

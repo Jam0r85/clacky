@@ -33,48 +33,6 @@ final class SampleStore {
     deinit { buffers.forEach { $0.deallocate() } }
 }
 
-// MARK: - Built-in synthesized switches
-
-final class SynthSource: SoundSource {
-    let profile: SwitchProfile
-    private let store = SampleStore()
-    /// sounds[size][down ? 0 : 1] = variants
-    private var sounds: [[[Sound]]] = []
-
-    var id: String { "synth:\(profile.id)" }
-    var displayName: String { profile.name }
-    var randomPitch: Bool { true }
-
-    init(profile: SwitchProfile) {
-        self.profile = profile
-
-        var rendered: [[[[Float]]]] = []
-        for size in KeySize.allCases {
-            var byDirection: [[[Float]]] = []
-            for (d, impacts) in [profile.down, profile.up].enumerated() {
-                byDirection.append((0..<size.variantCount).map { v in
-                    let seed = UInt64(size.rawValue * 1000 + d * 100 + v) &* 0x2545_F491_4F6C_DD1D
-                    return Synth.render(impacts, size: size, brightness: profile.brightness, seed: seed)
-                })
-            }
-            rendered.append(byDirection)
-        }
-
-        // Normalise the whole profile against a standard key press so every switch
-        // comes out at a similar loudness, while keeping release/space relative levels.
-        let standardDown = rendered[KeySize.standard.rawValue][0]
-        let reference = standardDown.map(Levels.loudness).reduce(0, +) / Float(standardDown.count)
-        let scale = reference > 0 ? Levels.target * profile.loudness / reference : 1
-        sounds = rendered.map { $0.map { $0.map { store.store(Levels.scaled($0, by: scale)) } } }
-    }
-
-    func sound(for keyCode: UInt16, down: Bool) -> Sound? {
-        let size = KeyLayout.info(for: keyCode).size
-        let variants = sounds[size.rawValue][down ? 0 : 1]
-        return variants[Int(KeyLayout.hash(keyCode) % UInt32(variants.count))]
-    }
-}
-
 // MARK: - Mechvibes-format sound packs
 
 enum SoundPackError: LocalizedError {
@@ -161,10 +119,10 @@ final class PackSource: SoundSource {
             guard let file = entry.file else { continue }
             if decoded[file] == nil {
                 let url = root.appendingPathComponent(file)
-                decoded[file] = (try? AudioDecoder.decodeMono(url: url, sampleRate: Double(Synth.sampleRate))) ?? []
+                decoded[file] = (try? AudioDecoder.decodeMono(url: url, sampleRate: Double(ClackEngine.sampleRate))) ?? []
             }
             guard let audio = decoded[file], !audio.isEmpty else { continue }
-            let sr = Double(Synth.sampleRate)
+            let sr = Double(ClackEngine.sampleRate)
             var lo = 0, hi = audio.count
             if let (startMs, endMs) = entry.segment {
                 lo = max(0, min(audio.count, Int(startMs / 1000 * sr)))
@@ -330,7 +288,7 @@ final class RecordedSource: SoundSource {
     init(recording: RecordedSwitch, directory: URL) throws {
         self.recording = recording
         let base = directory.appendingPathComponent(recording.folder)
-        let sr = Double(Synth.sampleRate)
+        let sr = Double(ClackEngine.sampleRate)
 
         func load(_ path: String) -> [Float]? {
             let url = base.appendingPathComponent(path)
@@ -414,7 +372,7 @@ enum Levels {
         let peak = x.reduce(0) { max($0, abs($1)) }
         guard peak > 0 else { return 0 }
         let onset = x.firstIndex { abs($0) > peak * 0.02 } ?? 0
-        let end = min(x.count, onset + Int(0.05 * Synth.sampleRate))
+        let end = min(x.count, onset + Int(0.05 * ClackEngine.sampleRate))
         guard end > onset else { return 0 }
         var sum: Float = 0
         for i in onset..<end { sum += x[i] * x[i] }

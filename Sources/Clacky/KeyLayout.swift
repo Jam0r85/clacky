@@ -1,22 +1,8 @@
 import Foundation
 
-/// Physical size class of a key: bigger keys have stabilisers and a deeper sound.
-enum KeySize: Int, CaseIterable {
-    case standard, wide, space
-
-    var variantCount: Int {
-        switch self {
-        case .standard: return 6
-        case .wide: return 3
-        case .space: return 2
-        }
-    }
-}
-
 struct KeyInfo {
     /// Horizontal position on the keyboard, 0 = far left, 1 = far right.
     let x: Float
-    let size: KeySize
     /// W3C `KeyboardEvent.code` name, used to look keys up in sound packs.
     let code: String?
 }
@@ -24,7 +10,7 @@ struct KeyInfo {
 /// Maps macOS virtual key codes (kVK_*) to where the key sits on an ANSI Mac keyboard.
 enum KeyLayout {
     static func info(for keyCode: UInt16) -> KeyInfo {
-        table[keyCode] ?? KeyInfo(x: 0.5, size: .standard, code: nil)
+        table[keyCode] ?? KeyInfo(x: 0.5, code: nil)
     }
 
     /// Stable per-key hash, so each key keeps its own slightly different voice.
@@ -40,8 +26,8 @@ enum KeyLayout {
 
     private static let table: [UInt16: KeyInfo] = {
         var t = [UInt16: KeyInfo]()
-        func put(_ keyCode: UInt16, _ units: Float, _ code: String, _ size: KeySize = .standard) {
-            t[keyCode] = KeyInfo(x: min(max(units / width, 0), 1), size: size, code: code)
+        func put(_ keyCode: UInt16, _ units: Float, _ code: String) {
+            t[keyCode] = KeyInfo(x: min(max(units / width, 0), 1), code: code)
         }
         func row(_ keys: [(UInt16, String)], from start: Float) {
             for (i, key) in keys.enumerated() { put(key.0, start + Float(i), key.1) }
@@ -56,34 +42,34 @@ enum KeyLayout {
         row([(50, "Backquote"), (18, "Digit1"), (19, "Digit2"), (20, "Digit3"), (21, "Digit4"),
              (23, "Digit5"), (22, "Digit6"), (26, "Digit7"), (28, "Digit8"), (25, "Digit9"),
              (29, "Digit0"), (27, "Minus"), (24, "Equal")], from: 0.5)
-        put(51, 13.75, "Backspace", .wide)
+        put(51, 13.75, "Backspace")
 
         // Top letter row
-        put(48, 0.75, "Tab", .wide)
+        put(48, 0.75, "Tab")
         row([(12, "KeyQ"), (13, "KeyW"), (14, "KeyE"), (15, "KeyR"), (17, "KeyT"), (16, "KeyY"),
              (32, "KeyU"), (34, "KeyI"), (31, "KeyO"), (35, "KeyP"), (33, "BracketLeft"),
              (30, "BracketRight")], from: 2.0)
         put(42, 14.0, "Backslash")
 
         // Home row
-        put(57, 0.875, "CapsLock", .wide)
+        put(57, 0.875, "CapsLock")
         row([(0, "KeyA"), (1, "KeyS"), (2, "KeyD"), (3, "KeyF"), (5, "KeyG"), (4, "KeyH"),
              (38, "KeyJ"), (40, "KeyK"), (37, "KeyL"), (41, "Semicolon"), (39, "Quote")], from: 2.25)
-        put(36, 13.6, "Enter", .wide)
+        put(36, 13.6, "Enter")
 
         // Bottom letter row
-        put(56, 1.125, "ShiftLeft", .wide)
+        put(56, 1.125, "ShiftLeft")
         put(10, 0.9, "IntlBackslash")
         row([(6, "KeyZ"), (7, "KeyX"), (8, "KeyC"), (9, "KeyV"), (11, "KeyB"), (45, "KeyN"),
              (46, "KeyM"), (43, "Comma"), (47, "Period"), (44, "Slash")], from: 2.75)
-        put(60, 13.4, "ShiftRight", .wide)
+        put(60, 13.4, "ShiftRight")
 
         // Space row
         put(63, 0.5, "Fn")
         put(59, 1.5, "ControlLeft")
         put(58, 2.5, "AltLeft")
         put(55, 3.6, "MetaLeft")
-        put(49, 7.0, "Space", .space)
+        put(49, 7.0, "Space")
         put(54, 10.4, "MetaRight")
         put(61, 11.5, "AltRight")
         put(62, 11.5, "ControlRight")
@@ -108,8 +94,8 @@ enum KeyLayout {
                              (91, "Numpad8"), (92, "Numpad9")] as [(UInt16, String)] {
             put(code, 17.0, name)
         }
-        put(76, 17.0, "NumpadEnter", .wide)
-        put(82, 17.0, "Numpad0", .wide)
+        put(76, 17.0, "NumpadEnter")
+        put(82, 17.0, "Numpad0")
         return t
     }()
 }

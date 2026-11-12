@@ -7,7 +7,7 @@ enum DevTools {
     /// Types a sentence through the real mixer for every switch and writes stereo WAVs.
     static func renderDemo(to directory: URL) -> Int32 {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let ids = RecordedSwitch.all.map { "rec:\($0.id)" } + SwitchProfile.all.map { "synth:\($0.id)" }
+        let ids = RecordedSwitch.all.map { "rec:\($0.id)" }
         let engine = ClackEngine()
         engine.volume = 1
 
@@ -67,7 +67,7 @@ enum DevTools {
         let mixer = kc_mixer_create()!
         defer { kc_mixer_destroy(mixer) }
         kc_mixer_set_volume(mixer, 1)
-        let sr = Double(Synth.sampleRate), block = 256
+        let sr = Double(ClackEngine.sampleRate), block = 256
         let total = Int(duration * sr)
         var left = [Float](repeating: 0, count: total), right = left
         var queue = events.sorted { $0.time < $1.time }[...]
@@ -95,7 +95,7 @@ enum DevTools {
         var data = Data()
         func u32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
         func u16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
-        let frames = UInt32(left.count), sr = UInt32(Synth.sampleRate)
+        let frames = UInt32(left.count), sr = UInt32(ClackEngine.sampleRate)
         data.append(contentsOf: Array("RIFF".utf8)); u32(36 + frames * 4)
         data.append(contentsOf: Array("WAVEfmt ".utf8)); u32(16); u16(1); u16(2)
         u32(sr); u32(sr * 4); u16(4); u16(16)
