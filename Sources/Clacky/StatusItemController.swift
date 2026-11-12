@@ -70,6 +70,8 @@ final class StatusItemController: NSObject {
         positionPanel()
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
+        // Recompute the shadow once the rounded content has actually drawn.
+        DispatchQueue.main.async { [weak self] in self?.panel.invalidateShadow() }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.12
             panel.animator().alphaValue = 1
@@ -137,14 +139,14 @@ final class StatusPanel: NSPanel {
         isMovable = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
 
+        // The behind-window blur is drawn by the window server for the whole window, so a
+        // layer corner radius doesn't clip it (the corners show square). A mask image does,
+        // and it also gives the window shadow the rounded shape.
         let background = NSVisualEffectView()
         background.material = .menu
         background.blendingMode = .behindWindow
         background.state = .active
-        background.wantsLayer = true
-        background.layer?.cornerRadius = 14
-        background.layer?.cornerCurve = .continuous
-        background.layer?.masksToBounds = true
+        background.maskImage = Self.roundedMask(radius: Self.cornerRadius)
 
         content.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(content)
@@ -158,6 +160,21 @@ final class StatusPanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { true }
+
+    static let cornerRadius: CGFloat = 14
+
+    /// A stretchable rounded rectangle: only the corners keep their shape when resized.
+    private static func roundedMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
+    }
 }
 
 /// Tells the controller when SwiftUI wants a different size (e.g. a permission banner appears).
