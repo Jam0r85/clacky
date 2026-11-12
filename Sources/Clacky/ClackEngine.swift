@@ -2,15 +2,24 @@ import AudioToolbox
 import AVFoundation
 import ClackyCore
 import CoreAudio
+import CoreGraphics
 import Foundation
 
 /// Owns the audio graph and turns key events into placed voices.
 ///
 /// Cost model: while you type, the audio thread mixes a handful of short voices.
-/// After `idleTimeout` seconds without a key, the engine pauses and the audio
-/// hardware is released, so an idle Clacky uses no audio CPU at all.
+/// Once you stop typing (`typingTimeout`) or leave the Mac (`awayTimeout`), the engine
+/// pauses and the audio hardware is released, so an idle Clacky uses no audio CPU at all.
 final class ClackEngine {
-    static let idleTimeout: CFTimeInterval = 20
+    /// How long the engine stays up after the last key. Long enough to ride out pauses for
+    /// reading and thinking: restarting the output costs little on built-in speakers, but
+    /// Bluetooth headphones drop the first few hundred ms while their link wakes, which
+    /// swallowed the first keystrokes after every pause.
+    static let typingTimeout: CFTimeInterval = 5 * 60
+    /// Lets go sooner once nobody is at the Mac (no key, mouse or trackpad input), because
+    /// a running output keeps coreaudiod holding off idle sleep.
+    static let awayTimeout: CFTimeInterval = 2 * 60
+    private static let anyInput = CGEventType(rawValue: ~0)! // kCGAnyInputEventType
     /// Every sound is decoded to this rate, and the mixer runs at it.
     static let sampleRate: Float = 48_000
 
@@ -169,14 +178,16 @@ final class ClackEngine {
             return
         }
         idleTimer?.invalidate()
-        let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in self?.checkIdle() }
-        timer.tolerance = 2
+        let timer = Timer(timeInterval: 10, repeats: true) { [weak self] _ in self?.checkIdle() }
+        timer.tolerance = 5
         RunLoop.main.add(timer, forMode: .common)
         idleTimer = timer
     }
 
     private func checkIdle() {
-        guard CFAbsoluteTimeGetCurrent() - lastActivity > Self.idleTimeout,
+        let sinceKey = CFAbsoluteTimeGetCurrent() - lastActivity
+        let sinceInput = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: Self.anyInput)
+        guard sinceKey > Self.typingTimeout || sinceInput > Self.awayTimeout,
               kc_mixer_active_voices(mixer) == 0 else { return }
         suspend()
     }

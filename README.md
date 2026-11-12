@@ -25,7 +25,7 @@ Love the sound of a mechanical keyboard but type on a MacBook? Clacky plays a re
 - **Feels like a real board.** Keys click going down and coming back up. The spacebar, Return, Backspace and Shift sound bigger, and each key has its own slightly different pitch. Holding a key doesn't machine-gun.
 - **Steady volume.** Turn your Mac up for a video and the clicks don't get louder. Turn it down and Clacky turns itself up to make up for it, by up to 18 dB (about four volume-key presses on the built-in speakers).
 - **Sound packs.** Import thousands more from the [Mechvibes](https://mechvibes.com/sound-packs) community, as a `.zip` or a folder.
-- **Light on your Mac.** It's a 3 MB app using about 17 MB of memory and no CPU while you're not typing. After 20 seconds idle it releases the audio hardware completely.
+- **Light on your Mac.** It's a 3 MB app using about 17 MB of memory and no CPU while you're not typing. It holds the audio output for 5 minutes after your last key (2 if you leave the Mac), so Bluetooth headphones don't swallow the first keystrokes after a pause, then releases it completely.
 - **Updates itself.** New versions download, are checked against the developer's signature, and install quietly.
 - **Private.** Clacky only checks *which* key you pressed, to pick a sound. It never records, stores or sends what you type. Its only network request is the update check to GitHub, which you can turn off.
 
