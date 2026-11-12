@@ -129,9 +129,18 @@ enum DevTools {
     /// Renders the panel in light and dark mode side by side (as if listening), for docs and review.
     static func exportPanel(to url: URL) -> Int32 {
         _ = NSApplication.shared
-        let model = AppModel()
+        let model = AppModel(checksForUpdates: false)
         model.refresh()
         model.markListeningForPreview()
+        switch ProcessInfo.processInfo.environment["CLACKY_PREVIEW_UPDATE"] {
+        case "ready": model.updater.previewStatus(.waitingToRestart(version: "1.1.0"), userInitiated: false)
+        case "manual": model.updater.previewStatus(.manualUpdateNeeded(version: "1.1.0", page: Updater.releasesAPI),
+                                                   userInitiated: false)
+        case "failed": model.updater.previewStatus(.failed("Update failed: The Internet connection appears to be offline."),
+                                                   userInitiated: true)
+        case "current": model.updater.previewStatus(.upToDate, userInitiated: true)
+        default: break
+        }
 
         var shots: [NSBitmapImageRep] = []
         for (name, fill) in [(NSAppearance.Name.aqua, NSColor(white: 0.95, alpha: 1)),
@@ -173,6 +182,43 @@ enum DevTools {
         NSGraphicsContext.restoreGraphicsState()
         try? out.representation(using: .png, properties: [:])?.write(to: url)
         return 0
+    }
+
+    /// Checks the real release feed and verifies the latest download, without installing anything.
+    static func checkUpdate() -> Int32 {
+        let done = DispatchSemaphore(value: 0)
+        var code: Int32 = 0
+        Task.detached {
+            let updater = Updater(startChecking: false)
+            do {
+                let release = try await updater.fetchLatestRelease()
+                let newer = Updater.version(release.version, isNewerThan: updater.currentVersion)
+                print("Running \(updater.currentVersion); latest release is \(release.version) (\(newer ? "newer" : "not newer"))")
+                guard let zip = release.zip else { throw Updater.UpdateError("the release has no Clacky.zip") }
+                let dir = FileManager.default.temporaryDirectory.appendingPathComponent("Clacky-check-\(UUID().uuidString)")
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: dir) }
+                let app = try await Updater.download(zip, version: release.version, into: dir)
+                print("Downloaded and verified \(app.lastPathComponent) \(release.version): signed by team \(Updater.teamID)")
+            } catch {
+                print("Update check failed: \(error.localizedDescription)")
+                code = 1
+            }
+            done.signal()
+        }
+        done.wait()
+
+        // A build that isn't Developer ID signed (like a local dev build) must be refused.
+        let local = URL(fileURLWithPath: "build/Clacky.app")
+        if FileManager.default.fileExists(atPath: local.path) {
+            do {
+                try Updater.verifySignature(of: local, identifier: Bundle.main.bundleIdentifier ?? "io.github.jam0r85.clacky")
+                print("Local build/Clacky.app passes the signature check (it's Developer ID signed)")
+            } catch {
+                print("Local build/Clacky.app is refused, as it should be: \(error.localizedDescription)")
+            }
+        }
+        return code
     }
 
     static func exportMenuBarIcon(to url: URL) -> Int32 {

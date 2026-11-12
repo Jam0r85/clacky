@@ -12,6 +12,12 @@ extension Color {
 /// The drop-down panel under the menu bar icon.
 struct PanelView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject private var updater: Updater
+
+    init(model: AppModel) {
+        _model = ObservedObject(wrappedValue: model)
+        _updater = ObservedObject(wrappedValue: model.updater)
+    }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
@@ -19,6 +25,7 @@ struct PanelView: View {
         VStack(alignment: .leading, spacing: 14) {
             header
             if model.needsPermission { permissionCard }
+            if updater.showsBanner { updateCard }
 
             section("Switch") {
                 LazyVGrid(columns: columns, spacing: 8) {
@@ -133,6 +140,84 @@ struct PanelView: View {
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.orange.opacity(0.12)))
     }
 
+    // MARK: - Updates
+
+    private var updateCard: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Group {
+                switch updater.status {
+                case .checking, .downloading, .installing, .restarting:
+                    ProgressView().controlSize(.small)
+                case .upToDate:
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                case .failed:
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                default:
+                    Image(systemName: "arrow.down.circle.fill").foregroundStyle(Color.clacky)
+                }
+            }
+            .font(.system(size: 15))
+            .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(updateTitle).font(.system(size: 12, weight: .semibold))
+                Text(updateDetail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 4)
+
+            switch updater.status {
+            case .waitingToRestart:
+                Button("Restart") { updater.restartNow() }
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+            case .manualUpdateNeeded(_, let page):
+                Button("Download") { model.dismissPanel?(); NSWorkspace.shared.open(page) }
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+            case .failed:
+                Button("Try Again") { updater.checkNow() }
+                    .controlSize(.small)
+            default:
+                EmptyView()
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(updateTint.opacity(0.12)))
+    }
+
+    private var updateTitle: String {
+        switch updater.status {
+        case .checking: return "Checking for updates"
+        case .upToDate: return "Clacky is up to date"
+        case .downloading(let v), .installing(let v), .restarting(let v): return "Updating to \(v)"
+        case .waitingToRestart(let v): return "Clacky \(v) is ready"
+        case .manualUpdateNeeded(let v, _): return "Clacky \(v) is available"
+        case .failed: return "Couldn't update"
+        case .idle: return ""
+        }
+    }
+
+    private var updateDetail: String {
+        switch updater.status {
+        case .upToDate: return "You have the latest version, \(updater.currentVersion)."
+        case .waitingToRestart: return "It restarts when you close this panel."
+        case .manualUpdateNeeded: return "Move Clacky to Applications to get updates automatically."
+        case .failed(let message): return message.replacingOccurrences(of: "Update failed: ", with: "")
+        default: return updater.statusText
+        }
+    }
+
+    private var updateTint: Color {
+        switch updater.status {
+        case .upToDate: return .green
+        case .failed: return .orange
+        default: return .clacky
+        }
+    }
+
     // MARK: - Settings
 
     private var controls: some View {
@@ -176,6 +261,11 @@ struct PanelView: View {
             Spacer()
 
             Menu {
+                Text("Clacky \(updater.currentVersion)")
+                Button("Check for Updates") { updater.checkNow() }
+                    .disabled(updater.isBusy)
+                Toggle("Update Automatically", isOn: $updater.automaticallyChecks)
+                Divider()
                 Button("About Clacky") { model.showAbout() }
                 Button("Clacky on GitHub") { model.openGitHub() }
                 Divider()
@@ -188,7 +278,12 @@ struct PanelView: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .tint(.secondary)
-            .help("More")
+            .overlay(alignment: .topTrailing) {
+                if updater.needsAttention {
+                    Circle().fill(Color.clacky).frame(width: 7, height: 7).offset(x: 2, y: -2)
+                }
+            }
+            .help(updater.needsAttention ? "An update is ready" : "More")
 
             Button { model.quit() } label: { Image(systemName: "power") }
                 .buttonStyle(.borderless)

@@ -12,6 +12,9 @@ if let i = arguments.firstIndex(of: "--check-pack"), i + 1 < arguments.count {
 if let i = arguments.firstIndex(of: "--export-panel"), i + 1 < arguments.count {
     exit(DevTools.exportPanel(to: URL(fileURLWithPath: arguments[i + 1])))
 }
+if arguments.contains("--check-update") {
+    exit(DevTools.checkUpdate())
+}
 if let i = arguments.firstIndex(of: "--export-icon"), i + 1 < arguments.count {
     exit(DevTools.exportMenuBarIcon(to: URL(fileURLWithPath: arguments[i + 1])))
 }

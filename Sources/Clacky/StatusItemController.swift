@@ -67,6 +67,7 @@ final class StatusItemController: NSObject {
     private func showPanel() {
         panelLoaded = true
         model.refresh()
+        model.updater.panelVisibilityChanged(true)
         positionPanel()
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
@@ -95,6 +96,7 @@ final class StatusItemController: NSObject {
         outsideClickMonitor = nil
         keyMonitor = nil
         statusItem.button?.highlight(false)
+        model.updater.panelVisibilityChanged(false)
         guard animated else {
             panel.orderOut(nil)
             return

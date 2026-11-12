@@ -25,7 +25,8 @@ Love the sound of a mechanical keyboard but type on a MacBook? Clacky plays a re
 - **Feels like a real board.** Keys click going down and coming back up. The spacebar, Return, Backspace and Shift sound bigger, and each key has its own slightly different pitch. Holding a key doesn't machine-gun.
 - **Sound packs.** Import thousands more from the [Mechvibes](https://mechvibes.com/sound-packs) community, as a `.zip` or a folder.
 - **Light on your Mac.** It's a 3 MB app using about 17 MB of memory and no CPU while you're not typing. After 20 seconds idle it releases the audio hardware completely.
-- **Private.** Clacky only checks *which* key you pressed, to pick a sound. It never records, stores or sends what you type, and it makes no network connections.
+- **Updates itself.** New versions download, are checked against the developer's signature, and install quietly.
+- **Private.** Clacky only checks *which* key you pressed, to pick a sound. It never records, stores or sends what you type. Its only network request is the update check to GitHub, which you can turn off.
 
 ## Install
 
@@ -44,6 +45,15 @@ Click the keycap in the menu bar to open the panel:
 - **Switch:** pick a switch and you'll hear a quick left-to-right preview.
 - **Sound packs:** import a Mechvibes pack, or right-click one to remove it.
 - **Volume, Spatial audio and Release sounds**, plus **Launch at login** at the bottom.
+- **•••** has the version, Check for Updates, Update Automatically, About, and the sound packs folder.
+
+## Updates
+
+Clacky checks GitHub for a new version every 6 hours. When it finds one, it downloads it and checks it's signed by the same developer as the copy you're running. Then it installs it and restarts, but never while the panel is open. If the panel is open, a card says the update is ready and a dot appears on **•••**.
+
+To check right away, choose **••• › Check for Updates**. To turn updates off, untick **••• › Update Automatically**.
+
+If Clacky can't replace itself, it shows a download link instead. That happens when it's running from the disk image or from a folder you can't write to. Moving it into Applications fixes it.
 
 ## Sound packs
 
@@ -89,7 +99,9 @@ Other targets:
 
 ### Releasing
 
-`./scripts/release.sh 1.2.0 "What's new"` sets the version, builds, signs with your Developer ID, notarizes and staples the app and a DMG, tags the commit and publishes a GitHub release. The comments at the top of the script cover the one-off setup.
+`./scripts/release.sh 1.2.0 "What's new"` sets the version, builds, signs with your Developer ID, notarizes and staples the app and a DMG, tags the commit and publishes a GitHub release. The release's `Clacky.zip` is what the updater installs. The comments at the top of the script cover the one-off setup.
+
+To test an update without publishing one, run a copy with `CLACKY_UPDATE_FEED` pointing at another release feed and pass `--update-now`. `--check-update` downloads and verifies the latest release without installing it.
 
 ## How it works
 
@@ -101,6 +113,7 @@ Other targets:
 | `Sources/Clacky/KeyLayout.swift` | Maps Mac key codes to positions on an ANSI keyboard and to `KeyboardEvent.code` names. |
 | `Sources/Clacky/SoundSource.swift` | Bundled recordings and Mechvibes packs, loudness-matched so every switch and key type sits at a similar level. |
 | `Sources/Clacky/AppModel.swift` | App state and actions. |
+| `Sources/Clacky/Updater.swift` | Checks the latest GitHub release, then verifies, installs and restarts. It only accepts a download that's the expected version and signed with the same Developer ID team. |
 | `Sources/Clacky/StatusItemController.swift`, `PanelView.swift` | The menu bar icon and its SwiftUI drop-down panel. |
 
 ## Credits

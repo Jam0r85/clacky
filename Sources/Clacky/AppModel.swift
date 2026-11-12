@@ -5,6 +5,7 @@ import ServiceManagement
 /// App state and actions, shared by the menu bar icon and the panel.
 final class AppModel: ObservableObject {
     let engine = ClackEngine()
+    let updater: Updater
     private let settings = Settings()
     private let monitor = KeyMonitor()
     private var permissionTimer: Timer?
@@ -45,7 +46,8 @@ final class AppModel: ObservableObject {
     private static let inputMonitoringURL =
         URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
 
-    init() {
+    init(checksForUpdates: Bool = true) {
+        updater = Updater(startChecking: checksForUpdates)
         enabled = settings.enabled
         sourceID = settings.sourceID
         volume = settings.volume
@@ -232,7 +234,8 @@ final class AppModel: ObservableObject {
         let credits = NSAttributedString(
             string: "Mechanical keyboard sounds for your Mac.\n\n" +
                 "Switch recordings from kbsim by Thomas Lai (MIT).\n" +
-                "Clacky only uses which key you pressed to pick a sound; it never records what you type.",
+                "Clacky only uses which key you pressed to pick a sound; it never records what you type. " +
+                "Its only network request is the update check to GitHub.",
             attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }

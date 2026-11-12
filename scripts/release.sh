@@ -3,7 +3,8 @@
 #
 #   ./scripts/release.sh 1.0.0 "What's new in this version."
 #
-# Uploads Clacky.dmg (for people downloading it) and Clacky.zip. Commit your changes first.
+# Uploads Clacky.dmg (for people downloading it) and Clacky.zip (what the app's built-in updater
+# installs). Commit your changes first.
 #
 # One-off setup on the Mac you release from:
 #   - A "Developer ID Application" certificate and its private key in your keychain.
@@ -93,7 +94,7 @@ git tag -a "$TAG" -m "Clacky $VERSION"
 git push -q origin HEAD "$TAG"
 "$GH" release create "$TAG" "$DMG" "$ZIP" --title "Clacky $VERSION" --notes "${NOTES:+$NOTES
 
-}Download **Clacky.dmg**, open it and drag Clacky into Applications. On first launch, allow Input Monitoring when macOS asks.
+}Download **Clacky.dmg**, open it and drag Clacky into Applications. On first launch, allow Input Monitoring when macOS asks. If you already have Clacky 1.1 or later, it updates itself.
 
 Needs macOS 13 or later, on Apple silicon or Intel."
 
