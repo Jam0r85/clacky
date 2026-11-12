@@ -8,6 +8,7 @@ final class AppModel: ObservableObject {
     let updater: Updater
     private let settings = Settings()
     private let monitor = KeyMonitor()
+    private let systemVolume = SystemVolume()
     private var permissionTimer: Timer?
 
     @Published private(set) var enabled: Bool
@@ -17,6 +18,18 @@ final class AppModel: ObservableObject {
     @Published private(set) var sourceID: String
     @Published private(set) var packs: [PackLibrary.Entry] = []
     @Published private(set) var launchAtLogin = false
+    /// The Mac's output is muted or at zero. macOS silences every app then, Clacky included.
+    @Published private(set) var macMuted = false
+
+    /// Holds Clacky's loudness when the Mac's volume changes.
+    @Published var steadyVolume: Bool {
+        didSet {
+            settings.steadyVolume = steadyVolume
+            // Start from how it sounds right now, so turning it on never jumps.
+            if steadyVolume, steadyVolume != oldValue { rememberVolumeReference() }
+            applySystemVolume()
+        }
+    }
 
     @Published var volume: Float {
         didSet {
@@ -53,6 +66,7 @@ final class AppModel: ObservableObject {
         volume = settings.volume
         spatial = settings.spatial
         releaseSounds = settings.releaseSounds
+        steadyVolume = settings.steadyVolume
         engine.volume = Self.gain(forSlider: volume)
         engine.spatial = spatial
         engine.releaseSounds = releaseSounds
@@ -64,6 +78,8 @@ final class AppModel: ObservableObject {
             settings.sourceID = sourceID
             try? engine.select(sourceID: sourceID)
         }
+        systemVolume.onChange = { [weak self] _ in self?.systemVolumeChanged() }
+        systemVolume.start()
         monitor.onKey = { [weak self] code, down in self?.engine.play(keyCode: code, down: down) }
         if enabled { startListening(prompt: true) }
         refresh()
@@ -78,6 +94,43 @@ final class AppModel: ObservableObject {
 
     /// For rendering the panel offscreen as if Clacky were listening.
     func markListeningForPreview() { listening = true }
+    func markMacMutedForPreview() { macMuted = true }
+
+    // MARK: - Mac volume
+
+    /// Most Clacky will boost itself to make up for a turned-down Mac. Beyond this it just
+    /// gets quieter: there's only so much room before the clicks would distort.
+    static let maxBoostDB: Float = 18
+
+    /// Digital gain that keeps Clacky sounding as it would at `referenceDB` while the Mac is
+    /// at `currentDB`. Turning the Mac up is fully made up for; turning it down only up to
+    /// `maxBoostDB`, and the mixer's limiter catches any peaks that would clip.
+    static func compensation(referenceDB: Float, currentDB: Float) -> Float {
+        let db = min(max(referenceDB - currentDB, -60), maxBoostDB)
+        return powf(10, db / 20)
+    }
+
+    private func systemVolumeChanged() {
+        guard let state = systemVolume.state else { return }
+        macMuted = state.muted
+        // First time on this device (new headphones...): hold it to how it sounds now.
+        if settings.volumeReferences[state.deviceUID] == nil { rememberVolumeReference() }
+        applySystemVolume()
+    }
+
+    private func rememberVolumeReference() {
+        guard let state = systemVolume.state, let db = state.levelDB else { return }
+        settings.volumeReferences[state.deviceUID] = db
+    }
+
+    private func applySystemVolume() {
+        guard steadyVolume, let state = systemVolume.state, let current = state.levelDB,
+              let reference = settings.volumeReferences[state.deviceUID] else {
+            engine.compensation = 1
+            return
+        }
+        engine.compensation = Self.compensation(referenceDB: reference, currentDB: current)
+    }
 
     // MARK: - What's playing
 
