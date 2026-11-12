@@ -26,7 +26,10 @@ if [[ -z "$IDENTITY" ]]; then
   IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Apple Development/ {print $2; exit}')"
 fi
 if [[ -n "$IDENTITY" ]]; then
-  codesign --force --sign "$IDENTITY" --options runtime --timestamp=none "$APP" >/dev/null
+  # Hardened runtime always; a secure timestamp for release builds (notarization needs both).
+  TIMESTAMP="--timestamp=none"
+  [[ "${RELEASE:-0}" == "1" ]] && TIMESTAMP="--timestamp"
+  codesign --force --sign "$IDENTITY" --options runtime "$TIMESTAMP" "$APP" >/dev/null
   echo "Signed with $(security find-identity -v -p codesigning | grep "$IDENTITY" | head -1 | sed 's/.*"\(.*\)"/\1/')"
 else
   codesign --force --sign - "$APP" >/dev/null

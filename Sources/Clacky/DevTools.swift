@@ -138,8 +138,9 @@ enum DevTools {
                              (NSAppearance.Name.darkAqua, NSColor(white: 0.16, alpha: 1))] {
             let host = NSHostingView(rootView: PanelView(model: model))
             let size = host.fittingSize
-            let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: size.width, height: size.height),
-                                  styleMask: [.borderless], backing: .buffered, defer: false)
+            let window = SnapshotPanel(contentRect: NSRect(x: 40, y: 40, width: size.width, height: size.height),
+                                       styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            window.alphaValue = 0.01
             window.appearance = NSAppearance(named: name)
             let container = NSView(frame: NSRect(origin: .zero, size: size))
             container.wantsLayer = true
@@ -148,7 +149,7 @@ enum DevTools {
             host.frame = container.bounds
             container.addSubview(host)
             window.contentView = container
-            window.orderFrontRegardless()
+            window.makeKeyAndOrderFront(nil)
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             let rep = container.bitmapImageRepForCachingDisplay(in: container.bounds)!
             container.cacheDisplay(in: container.bounds, to: rep)
@@ -195,4 +196,9 @@ enum DevTools {
         "q": 12, "w": 13, "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32, "i": 34, "p": 35,
         "l": 37, "j": 38, "k": 40, "n": 45, "m": 46, " ": 49,
     ]
+}
+
+/// Key-capable panel so controls render in their active (tinted) state for screenshots.
+private final class SnapshotPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
 }
