@@ -1,6 +1,7 @@
 import AppKit
 import ClackyCore
 import Foundation
+import SwiftUI
 
 /// Offline helpers for tuning sounds without the menu bar UI or any permissions.
 enum DevTools {
@@ -123,6 +124,54 @@ enum DevTools {
             print("Failed: \(error.localizedDescription)")
             return 1
         }
+    }
+
+    /// Renders the panel in light and dark mode side by side (as if listening), for docs and review.
+    static func exportPanel(to url: URL) -> Int32 {
+        _ = NSApplication.shared
+        let model = AppModel()
+        model.refresh()
+        model.markListeningForPreview()
+
+        var shots: [NSBitmapImageRep] = []
+        for (name, fill) in [(NSAppearance.Name.aqua, NSColor(white: 0.95, alpha: 1)),
+                             (NSAppearance.Name.darkAqua, NSColor(white: 0.16, alpha: 1))] {
+            let host = NSHostingView(rootView: PanelView(model: model))
+            let size = host.fittingSize
+            let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: size.width, height: size.height),
+                                  styleMask: [.borderless], backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: name)
+            let container = NSView(frame: NSRect(origin: .zero, size: size))
+            container.wantsLayer = true
+            container.layer?.backgroundColor = fill.cgColor
+            container.layer?.cornerRadius = 14
+            host.frame = container.bounds
+            container.addSubview(host)
+            window.contentView = container
+            window.orderFrontRegardless()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            let rep = container.bitmapImageRepForCachingDisplay(in: container.bounds)!
+            container.cacheDisplay(in: container.bounds, to: rep)
+            shots.append(rep)
+            window.orderOut(nil)
+        }
+
+        let gap = 24, scale = shots[0].pixelsWide / Int(shots[0].size.width)
+        let width = shots.reduce(0) { $0 + $1.pixelsWide } + gap * scale
+        let height = shots.map(\.pixelsHigh).max() ?? 0
+        let out = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8,
+                                   samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                   bytesPerRow: 0, bitsPerPixel: 0)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
+        var x = 0
+        for shot in shots {
+            shot.draw(in: NSRect(x: x, y: height - shot.pixelsHigh, width: shot.pixelsWide, height: shot.pixelsHigh))
+            x += shot.pixelsWide + gap * scale
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        try? out.representation(using: .png, properties: [:])?.write(to: url)
+        return 0
     }
 
     static func exportMenuBarIcon(to url: URL) -> Int32 {

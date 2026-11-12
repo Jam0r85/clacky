@@ -237,29 +237,42 @@ struct RecordedSwitch: Identifiable {
     let id: String
     let folder: String
     let name: String
+    /// Fits a tile in the panel.
+    let shortName: String
     let kind: String
+    /// Stem colour, used for the little switch glyph in the panel.
+    let color: UInt32
 
-    /// Grouped clicky → tactile → linear → other; a nil entry is a menu separator.
-    static let menuOrder: [RecordedSwitch?] = [
-        .init(id: "mx-blue", folder: "mxblue", name: "Cherry MX Blue", kind: "Clicky"),
-        .init(id: "box-navy", folder: "boxnavy", name: "Kailh Box Navy", kind: "Clicky · heavy"),
-        .init(id: "alps-blue", folder: "bluealps", name: "Alps Blue", kind: "Clicky · vintage"),
-        nil,
-        .init(id: "mx-brown", folder: "mxbrown", name: "Cherry MX Brown", kind: "Tactile"),
-        .init(id: "holy-panda", folder: "holypanda", name: "Holy Panda", kind: "Tactile · thocky"),
-        nil,
-        .init(id: "mx-black", folder: "mxblack", name: "Cherry MX Black", kind: "Linear · heavy"),
-        .init(id: "red-ink", folder: "redink", name: "Gateron Red Ink", kind: "Linear · light"),
-        .init(id: "black-ink", folder: "blackink", name: "Gateron Black Ink", kind: "Linear · deep"),
-        .init(id: "nk-cream", folder: "cream", name: "NovelKeys Cream", kind: "Linear · POM"),
-        .init(id: "alpaca", folder: "alpaca", name: "Alpaca", kind: "Linear · smooth"),
-        .init(id: "tealios", folder: "turquoise", name: "Turquoise Tealios", kind: "Linear · premium"),
-        nil,
-        .init(id: "topre", folder: "topre", name: "Topre", kind: "Electro-capacitive"),
-        .init(id: "buckling-spring", folder: "buckling", name: "Buckling Spring", kind: "IBM Model M"),
+    /// Grouped clicky → tactile → linear → other.
+    static let all: [RecordedSwitch] = [
+        .init(id: "mx-blue", folder: "mxblue", name: "Cherry MX Blue", shortName: "MX Blue",
+              kind: "Clicky", color: 0x3B7BF2),
+        .init(id: "box-navy", folder: "boxnavy", name: "Kailh Box Navy", shortName: "Box Navy",
+              kind: "Clicky · heavy", color: 0x24366E),
+        .init(id: "alps-blue", folder: "bluealps", name: "Alps Blue", shortName: "Alps Blue",
+              kind: "Clicky · vintage", color: 0x7DB9F0),
+        .init(id: "mx-brown", folder: "mxbrown", name: "Cherry MX Brown", shortName: "MX Brown",
+              kind: "Tactile", color: 0x8B5A33),
+        .init(id: "holy-panda", folder: "holypanda", name: "Holy Panda", shortName: "Holy Panda",
+              kind: "Tactile · thocky", color: 0xC98FD0),
+        .init(id: "mx-black", folder: "mxblack", name: "Cherry MX Black", shortName: "MX Black",
+              kind: "Linear · heavy", color: 0x2A2A2E),
+        .init(id: "red-ink", folder: "redink", name: "Gateron Red Ink", shortName: "Red Ink",
+              kind: "Linear · light", color: 0xE0393E),
+        .init(id: "black-ink", folder: "blackink", name: "Gateron Black Ink", shortName: "Black Ink",
+              kind: "Linear · deep", color: 0x4A4A55),
+        .init(id: "nk-cream", folder: "cream", name: "NovelKeys Cream", shortName: "NK Cream",
+              kind: "Linear · POM", color: 0xF1E3BE),
+        .init(id: "alpaca", folder: "alpaca", name: "Alpaca", shortName: "Alpaca",
+              kind: "Linear · smooth", color: 0xF29BB8),
+        .init(id: "tealios", folder: "turquoise", name: "Turquoise Tealios", shortName: "Tealios",
+              kind: "Linear · premium", color: 0x2FBFBF),
+        .init(id: "topre", folder: "topre", name: "Topre", shortName: "Topre",
+              kind: "Electro-capacitive", color: 0x9A96A8),
+        .init(id: "buckling-spring", folder: "buckling", name: "Buckling Spring", shortName: "Buckling Spring",
+              kind: "IBM Model M", color: 0xC9BFA8),
     ]
 
-    static let all: [RecordedSwitch] = menuOrder.compactMap { $0 }
     static let `default` = all.first { $0.id == "holy-panda" }!
 
     static func named(_ id: String) -> RecordedSwitch? { all.first { $0.id == id } }

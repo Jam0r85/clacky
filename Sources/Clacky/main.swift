@@ -9,6 +9,9 @@ if let i = arguments.firstIndex(of: "--render-demo"), i + 1 < arguments.count {
 if let i = arguments.firstIndex(of: "--check-pack"), i + 1 < arguments.count {
     exit(DevTools.checkPack(at: URL(fileURLWithPath: arguments[i + 1])))
 }
+if let i = arguments.firstIndex(of: "--export-panel"), i + 1 < arguments.count {
+    exit(DevTools.exportPanel(to: URL(fileURLWithPath: arguments[i + 1])))
+}
 if let i = arguments.firstIndex(of: "--export-icon"), i + 1 < arguments.count {
     exit(DevTools.exportMenuBarIcon(to: URL(fileURLWithPath: arguments[i + 1])))
 }
@@ -21,6 +24,7 @@ if let id = Bundle.main.bundleIdentifier,
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let controller = AppController()
-controller.start()
+let model = AppModel()
+let statusItem = StatusItemController(model: model)
+model.start()
 app.run()
