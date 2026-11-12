@@ -10,6 +10,9 @@
 #define KC_QUEUE_SIZE 64 /* must be a power of two */
 #define KC_QUEUE_MASK (KC_QUEUE_SIZE - 1)
 #define KC_FILTER_TAIL 64.0f /* extra samples so the low-pass can ring out */
+#define KC_MAX_VOLUME 8.0f   /* +18 dB, room to make up for a turned-down Mac */
+#define KC_LIMIT_CEILING 0.95f
+#define KC_LIMIT_RECOVERY 0.0003f /* per sample, back towards unity: ~70 ms at 48 kHz */
 
 typedef struct {
     kc_voice_params p;
@@ -28,6 +31,9 @@ struct kc_mixer {
     os_unfair_lock producer_lock;
     _Atomic float volume;
     _Atomic uint32_t active_count;
+    /* Audio thread only. */
+    float applied_volume; /* ramps to `volume` across a block, so changes don't click */
+    float limit_gain;     /* peak limiter, 1 = not limiting */
 };
 
 kc_mixer *kc_mixer_create(void) {
@@ -35,6 +41,8 @@ kc_mixer *kc_mixer_create(void) {
     if (!m) return NULL;
     m->producer_lock = OS_UNFAIR_LOCK_INIT;
     atomic_store(&m->volume, 0.6f);
+    m->applied_volume = 0.6f;
+    m->limit_gain = 1.0f;
     return m;
 }
 
@@ -58,7 +66,7 @@ bool kc_mixer_trigger(kc_mixer *m, const kc_voice_params *p) {
 void kc_mixer_set_volume(kc_mixer *m, float v) {
     if (!m) return;
     if (!(v >= 0.0f)) v = 0.0f; /* also catches NaN */
-    if (v > 1.0f) v = 1.0f;
+    if (v > KC_MAX_VOLUME) v = KC_MAX_VOLUME;
     atomic_store_explicit(&m->volume, v, memory_order_relaxed);
 }
 
@@ -68,6 +76,7 @@ void kc_mixer_reset(kc_mixer *m) {
     for (int i = 0; i < KC_MAX_VOICES; i++) m->voices[i].active = false;
     atomic_store(&m->head, atomic_load(&m->tail));
     atomic_store(&m->active_count, 0);
+    m->limit_gain = 1.0f;
     os_unfair_lock_unlock(&m->producer_lock);
 }
 
@@ -139,6 +148,7 @@ bool kc_mixer_render(kc_mixer *m, uint32_t frames, float *left, float *right) {
     start_queued_voices(m);
 
     const float volume = atomic_load_explicit(&m->volume, memory_order_relaxed);
+    if (frames == 0) return false;
     uint32_t still_active = 0;
     bool rendered = false;
 
@@ -150,7 +160,7 @@ bool kc_mixer_render(kc_mixer *m, uint32_t frames, float *left, float *right) {
         const float *s = v->p.samples;
         const uint32_t len = v->p.length;
         const float rate = v->p.rate;
-        const float gl = v->p.gain_l * volume, gr = v->p.gain_r * volume;
+        const float gl = v->p.gain_l, gr = v->p.gain_r;
         const float dl = v->p.delay_l, dr = v->p.delay_r;
         const float cl = v->p.lp_l, cr = v->p.lp_r;
         const float end = v->end;
@@ -177,11 +187,27 @@ bool kc_mixer_render(kc_mixer *m, uint32_t frames, float *left, float *right) {
 
     atomic_store_explicit(&m->active_count, still_active, memory_order_relaxed);
 
-    if (rendered) {
-        for (uint32_t i = 0; i < frames; i++) {
-            left[i] = clampf(left[i], -1.0f, 1.0f);
-            right[i] = clampf(right[i], -1.0f, 1.0f);
-        }
+    if (!rendered) {
+        m->applied_volume = volume;
+        m->limit_gain = 1.0f;
+        return false;
     }
-    return rendered;
+
+    /* Master volume, then a stereo-linked peak limiter: it pulls the gain down at once
+     * when a click would pass the ceiling and lets it recover over ~70 ms. Below the
+     * ceiling it does nothing, so normal levels are untouched. */
+    float vol = m->applied_volume, g = m->limit_gain;
+    const float step = (volume - vol) / (float)frames;
+    for (uint32_t i = 0; i < frames; i++) {
+        vol += step;
+        const float l = left[i] * vol, r = right[i] * vol;
+        const float peak = fmaxf(fabsf(l), fabsf(r));
+        if (peak * g > KC_LIMIT_CEILING) g = KC_LIMIT_CEILING / peak;
+        left[i] = clampf(l * g, -1.0f, 1.0f);
+        right[i] = clampf(r * g, -1.0f, 1.0f);
+        g += (1.0f - g) * KC_LIMIT_RECOVERY;
+    }
+    m->applied_volume = volume;
+    m->limit_gain = g;
+    return true;
 }

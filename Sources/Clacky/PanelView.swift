@@ -240,6 +240,25 @@ struct PanelView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
 
+            if model.macMuted {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Image(systemName: "speaker.slash.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.orange)
+                        .frame(width: 18)
+                    Text("Your Mac is muted, which silences every app, Clacky included.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 8)
+            }
+
+            Divider().padding(.leading, 38)
+            ToggleRow(symbol: "dial.medium", title: "Steady volume",
+                      detail: "Holds level as Mac volume changes", isOn: $model.steadyVolume)
             Divider().padding(.leading, 38)
             ToggleRow(symbol: "headphones", title: "Spatial audio",
                       detail: "Each key plays from where it sits", isOn: $model.spatial)

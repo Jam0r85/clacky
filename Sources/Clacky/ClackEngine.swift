@@ -29,7 +29,9 @@ final class ClackEngine {
 
     var spatial = true
     var releaseSounds = true
-    var volume: Float = 0.6 { didSet { kc_mixer_set_volume(mixer, volume) } }
+    var volume: Float = 0.6 { didSet { applyVolume() } }
+    /// Extra gain that makes up for the Mac's own volume (1 = none). Can go above 1.
+    var compensation: Float = 1 { didSet { applyVolume() } }
 
     init() {
         mixer = kc_mixer_create()
@@ -60,6 +62,8 @@ final class ClackEngine {
         engine.stop()
         kc_mixer_destroy(mixer)
     }
+
+    private func applyVolume() { kc_mixer_set_volume(mixer, volume * compensation) }
 
     // MARK: - Sounds
 

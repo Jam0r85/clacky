@@ -23,6 +23,7 @@ Love the sound of a mechanical keyboard but type on a MacBook? Clacky plays a re
 - **13 real switches.** Cherry MX Blue, Brown and Black. Holy Panda, Topre, Buckling Spring, NovelKeys Cream, Kailh Box Navy, Alps Blue, Gateron Red and Black Ink, Alpaca, and Turquoise Tealios.
 - **Spatial audio.** Each key gets its own position, with the small timing and level differences your ears use to place a sound. It's best with headphones.
 - **Feels like a real board.** Keys click going down and coming back up. The spacebar, Return, Backspace and Shift sound bigger, and each key has its own slightly different pitch. Holding a key doesn't machine-gun.
+- **Steady volume.** Turn your Mac up for a video and the clicks don't get louder. Turn it down and Clacky turns itself up to make up for it, by up to 18 dB (about four volume-key presses on the built-in speakers).
 - **Sound packs.** Import thousands more from the [Mechvibes](https://mechvibes.com/sound-packs) community, as a `.zip` or a folder.
 - **Light on your Mac.** It's a 3 MB app using about 17 MB of memory and no CPU while you're not typing. After 20 seconds idle it releases the audio hardware completely.
 - **Updates itself.** New versions download, are checked against the developer's signature, and install quietly.
@@ -44,7 +45,7 @@ Click the keycap in the menu bar to open the panel:
 - **On/off switch** at the top. You can also **⌥-click** the menu bar icon to toggle Clacky without opening anything. The icon is filled when Clacky is on and outlined when it's off.
 - **Switch:** pick a switch and you'll hear a quick left-to-right preview.
 - **Sound packs:** import a Mechvibes pack, or right-click one to remove it.
-- **Volume, Spatial audio and Release sounds**, plus **Launch at login** at the bottom.
+- **Volume, Steady volume, Spatial audio and Release sounds**, plus **Launch at login** at the bottom.
 - **•••** has the version, Check for Updates, Update Automatically, About, and the sound packs folder.
 
 ## Updates
@@ -69,6 +70,8 @@ Audio can be OGG, MP3, WAV, FLAC, AIFF or M4A. Keys a pack doesn't define borrow
 ## Troubleshooting
 
 **No sound when I type.** Make sure the switch at the top of the panel is on and the icon in the menu bar is filled. If the panel says *Allow Input Monitoring*, follow it. Also check the volume slider and your Mac's output volume.
+
+**Can I hear Clacky while my Mac is muted?** No. macOS applies mute and the volume to the output device after every app's sound has been mixed together, so no app can play through it. With **Steady volume** on, Clacky holds each output device to the loudness it had when Clacky first used that device, or when you last turned the setting on while using it. Turning the Mac up is fully made up for. Turning it down is made up for by up to 18 dB, and past that Clacky gets quieter too, because the clicks would otherwise distort. To reset the level it holds, set your Mac's volume where you usually keep it, then turn Steady volume off and on again.
 
 **It's silent in password fields.** That's intended. macOS hides keystrokes from every app while a password field has focus.
 
@@ -107,7 +110,8 @@ To test an update without publishing one, run a copy with `CLACKY_UPDATE_FEED` p
 
 | File | What it does |
 |---|---|
-| `Sources/ClackyCore/mixer.c` | The real-time voice mixer: a lock-free trigger queue, 32 voices, per-ear gain, fractional delay and low-pass. It never allocates or locks on the audio thread. |
+| `Sources/ClackyCore/mixer.c` | The real-time voice mixer: a lock-free trigger queue, 32 voices, per-ear gain, fractional delay and low-pass, and a peak limiter for when Clacky boosts itself. It never allocates or locks on the audio thread. |
+| `Sources/Clacky/SystemVolume.swift` | Watches the output device's volume (in dB, on the device's own curve) and mute, for Steady volume and the muted note in the panel. |
 | `Sources/Clacky/ClackEngine.swift` | The AVAudioEngine graph, binaural placement (Woodworth ITD, level difference and head shadow), idle suspend and output device changes. |
 | `Sources/Clacky/KeyMonitor.swift` | A listen-only `CGEventTap` for key down, key up and modifier keys. It ignores auto-repeat. |
 | `Sources/Clacky/KeyLayout.swift` | Maps Mac key codes to positions on an ANSI keyboard and to `KeyboardEvent.code` names. |

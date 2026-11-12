@@ -132,6 +132,7 @@ enum DevTools {
         let model = AppModel(checksForUpdates: false)
         model.refresh()
         model.markListeningForPreview()
+        if ProcessInfo.processInfo.environment["CLACKY_PREVIEW_MUTED"] == "1" { model.markMacMutedForPreview() }
         switch ProcessInfo.processInfo.environment["CLACKY_PREVIEW_UPDATE"] {
         case "ready": model.updater.previewStatus(.waitingToRestart(version: "1.1.0"), userInitiated: false)
         case "manual": model.updater.previewStatus(.manualUpdateNeeded(version: "1.1.0", page: Updater.releasesAPI),

@@ -39,7 +39,7 @@ void kc_mixer_destroy(kc_mixer *mixer);
 /// Queues a voice to start on the next render cycle. Returns false if the queue is full.
 bool kc_mixer_trigger(kc_mixer *mixer, const kc_voice_params *params);
 
-/// Master volume, 0...1.
+/// Master volume, 0...8. Above 1 is a boost; a peak limiter keeps the output below full scale.
 void kc_mixer_set_volume(kc_mixer *mixer, float volume);
 
 /// Silences every voice and drops queued triggers. Only call while the audio
