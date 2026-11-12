@@ -49,6 +49,11 @@ void kc_mixer_reset(kc_mixer *mixer);
 /// Number of voices currently sounding (approximate, for idle detection).
 uint32_t kc_mixer_active_voices(kc_mixer *mixer);
 
+/// Seconds since the audio thread last asked for a block (infinity if it never has).
+/// While the output is running this stays at a few milliseconds; if it grows, the
+/// output has stopped pulling audio even though the engine still says it's running.
+double kc_mixer_seconds_since_render(kc_mixer *mixer);
+
 /// Renders `frames` samples into non-interleaved stereo buffers (overwrites them).
 /// Returns false if the output is pure silence.
 bool kc_mixer_render(kc_mixer *mixer, uint32_t frames, float *left, float *right);

@@ -28,7 +28,17 @@ final class ClackEngine {
     private var sourceNode: AVAudioSourceNode!
     private var idleTimer: Timer?
     private var lastActivity: CFAbsoluteTime = 0
+    private var startedAt: CFAbsoluteTime = 0
     private var configObserver: NSObjectProtocol?
+    private var deviceListener: AudioObjectPropertyListenerBlock?
+    private var pendingRebuild: DispatchWorkItem?
+
+    /// A running output asks for audio every few milliseconds. Going this long without a
+    /// request means it's wedged (the device went away, coreaudiod restarted...).
+    static let stallTimeout: CFTimeInterval = 2
+    private static let defaultOutputAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
 
     /// Built-in sources are small, so they're kept once made. Imported packs are freed
     /// when replaced, but only while the audio thread is idle (see `freeRetired`).
@@ -63,11 +73,26 @@ final class ClackEngine {
 
         configObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
-        ) { [weak self] _ in self?.handleConfigurationChange() }
+        ) { [weak self] _ in self?.rebuild() }
+
+        // AVAudioEngine doesn't always post a configuration change when the output moves to
+        // another device (headphones disconnecting while Clacky is playing, say). It follows
+        // the new device but keeps buffer sizes worked out for the old one, and every render
+        // then fails, silently, until the app quits. So rebuild on every default-output change.
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.outputDeviceChanged() }
+        var address = Self.defaultOutputAddress
+        if AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener) == noErr {
+            deviceListener = listener
+        }
     }
 
     deinit {
         if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
+        if let deviceListener {
+            var address = Self.defaultOutputAddress
+            AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, deviceListener)
+        }
+        pendingRebuild?.cancel()
         engine.stop()
         kc_mixer_destroy(mixer)
     }
@@ -108,8 +133,8 @@ final class ClackEngine {
 
     func play(keyCode: UInt16, down: Bool) {
         guard var params = voice(for: keyCode, down: down) else { return }
+        wake() // first: recovering a wedged output resets the mixer, which would drop this voice
         kc_mixer_trigger(mixer, &params)
-        wake()
     }
 
     /// A short left-to-right run across the keyboard, to audition a switch and the spatial spread.
@@ -170,13 +195,18 @@ final class ClackEngine {
 
     private func wake() {
         lastActivity = CFAbsoluteTimeGetCurrent()
-        guard !engine.isRunning else { return }
+        if engine.isRunning {
+            guard isStalled else { return }
+            NSLog("Clacky: the audio output stopped asking for sound; rebuilding it")
+            rebuild()
+        }
         do {
             try engine.start()
         } catch {
             NSLog("Clacky: audio engine failed to start: \(error.localizedDescription)")
             return
         }
+        startedAt = CFAbsoluteTimeGetCurrent()
         idleTimer?.invalidate()
         let timer = Timer(timeInterval: 10, repeats: true) { [weak self] _ in self?.checkIdle() }
         timer.tolerance = 5
@@ -184,7 +214,21 @@ final class ClackEngine {
         idleTimer = timer
     }
 
+    /// The engine says it's running, but the output hasn't asked for audio in a while.
+    /// Queued clicks then never play, so the idle check below would wait on them forever
+    /// and keep the audio hardware (and the Mac) awake for hours.
+    private var isStalled: Bool {
+        engine.isRunning
+            && CFAbsoluteTimeGetCurrent() - startedAt > Self.stallTimeout
+            && kc_mixer_seconds_since_render(mixer) > Self.stallTimeout
+    }
+
     private func checkIdle() {
+        if isStalled {
+            NSLog("Clacky: the audio output stopped asking for sound; releasing it")
+            rebuild()
+            return
+        }
         let sinceKey = CFAbsoluteTimeGetCurrent() - lastActivity
         let sinceInput = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: Self.anyInput)
         guard sinceKey > Self.typingTimeout || sinceInput > Self.awayTimeout,
@@ -207,13 +251,26 @@ final class ClackEngine {
         retired.removeAll()
     }
 
-    private func handleConfigurationChange() {
-        // The output device changed (headphones, AirPods, display audio...). The engine
-        // has already stopped; rewire to the new hardware format and wait for the next key.
+    /// The default output changed (headphones, AirPods, display audio...). Waits a moment
+    /// for the switch to settle, and coalesces the burst of changes a Bluetooth hand-off makes.
+    private func outputDeviceChanged() {
+        pendingRebuild?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.rebuild() }
+        pendingRebuild = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+    }
+
+    /// Stops the engine and rewires it to the current output's format, so buffer sizes are
+    /// worked out afresh for that device. The next key press starts it again.
+    private func rebuild() {
+        pendingRebuild?.cancel()
+        pendingRebuild = nil
         idleTimer?.invalidate()
         idleTimer = nil
+        engine.stop()
         kc_mixer_reset(mixer)
         retired.removeAll()
+        engine.reset()
         let hardware = engine.outputNode.outputFormat(forBus: 0)
         if hardware.sampleRate > 0 {
             engine.connect(engine.mainMixerNode, to: engine.outputNode, format: hardware)

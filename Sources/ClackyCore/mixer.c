@@ -1,5 +1,6 @@
 #include "ClackyCore.h"
 
+#include <mach/mach_time.h>
 #include <math.h>
 #include <os/lock.h>
 #include <stdatomic.h>
@@ -31,6 +32,7 @@ struct kc_mixer {
     os_unfair_lock producer_lock;
     _Atomic float volume;
     _Atomic uint32_t active_count;
+    _Atomic uint64_t last_render; /* mach_absolute_time() of the latest render call, 0 = never */
     /* Audio thread only. */
     float applied_volume; /* ramps to `volume` across a block, so changes don't click */
     float limit_gain;     /* peak limiter, 1 = not limiting */
@@ -85,6 +87,17 @@ uint32_t kc_mixer_active_voices(kc_mixer *m) {
     uint32_t pending = atomic_load_explicit(&m->tail, memory_order_acquire) -
                        atomic_load_explicit(&m->head, memory_order_acquire);
     return atomic_load_explicit(&m->active_count, memory_order_relaxed) + pending;
+}
+
+double kc_mixer_seconds_since_render(kc_mixer *m) {
+    if (!m) return INFINITY;
+    uint64_t last = atomic_load_explicit(&m->last_render, memory_order_relaxed);
+    if (last == 0) return INFINITY;
+    uint64_t now = mach_absolute_time();
+    if (now <= last) return 0;
+    mach_timebase_info_data_t timebase;
+    mach_timebase_info(&timebase);
+    return (double)(now - last) * timebase.numer / timebase.denom / 1e9;
 }
 
 static inline float sample_at(const float *s, uint32_t len, float x) {
@@ -144,6 +157,7 @@ bool kc_mixer_render(kc_mixer *m, uint32_t frames, float *left, float *right) {
     memset(left, 0, frames * sizeof(float));
     memset(right, 0, frames * sizeof(float));
     if (!m) return false;
+    atomic_store_explicit(&m->last_render, mach_absolute_time(), memory_order_relaxed);
 
     start_queued_voices(m);
 
